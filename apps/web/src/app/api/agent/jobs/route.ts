@@ -32,8 +32,11 @@ export async function GET(req: NextRequest) {
   const job = await prisma.scanJob.findFirst({
     where: {
       organizationId: auth.organizationId,
-      agentTokenId: auth.agentToken.id,
       status: "PENDING",
+      OR: [
+        { agentTokenId: auth.agentToken.id },
+        { agentTokenId: null },
+      ],
     },
     orderBy: { createdAt: "asc" },
     include: {
@@ -48,13 +51,20 @@ export async function GET(req: NextRequest) {
 
   if (!job) return new NextResponse(null, { status: 204 })
 
-  // Verifica sicurezza prima di consegnare il job
+  // Security gate
   if (!["APPROVED", "IN_PROGRESS"].includes(job.assessment.status)) {
     return new NextResponse(null, { status: 204 })
   }
   if (job.assessment.roe?.status !== "APPROVED") {
     return new NextResponse(null, { status: 204 })
   }
+
+  // Claim the job atomically: set to QUEUED and assign this agent
+  const claimed = await prisma.scanJob.updateMany({
+    where: { id: job.id, status: "PENDING" },
+    data: { status: "QUEUED", agentTokenId: auth.agentToken.id },
+  })
+  if (claimed.count === 0) return new NextResponse(null, { status: 204 }) // another agent claimed it first
 
   const targets = job.assessment.scopeItems.map((s) => s.asset.value)
 

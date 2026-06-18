@@ -43,7 +43,7 @@ export class Poller {
     try {
       const job = await this.fetchNextJob()
       if (job) {
-        console.log(`[AGENT] Job ricevuto: ${job.id} (${job.type})`)
+        console.log(`[AGENT] Job ricevuto: ${job.id} (${job.type}) — target: ${job.targets.join(", ")}`)
         await this.runJob(job)
       }
     } catch (err: any) {
@@ -61,9 +61,7 @@ export class Poller {
         "Content-Type": "application/json",
         "User-Agent": "ScopeGuard-Agent/0.1",
       },
-      // Solo outbound — nessuna connessione inbound
     })
-
     if (res.status === 204) return null
     if (!res.ok) {
       if (res.status === 401) {
@@ -73,43 +71,65 @@ export class Poller {
       }
       throw new Error(`Poll failed: ${res.status} ${res.statusText}`)
     }
-
     return res.json() as Promise<AgentJob>
+  }
+
+  private async sendLog(jobId: string, line: string) {
+    try {
+      const { default: fetch } = await import("node-fetch")
+      await fetch(`${this.config.platformUrl}/api/agent/jobs/${jobId}/log`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.config.agentToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ line }),
+      })
+    } catch {
+      // log push non bloccante
+    }
   }
 
   private async runJob(job: AgentJob) {
     const { default: fetch } = await import("node-fetch")
 
+    const ts = () => new Date().toISOString().slice(11, 19)
+    const log = async (msg: string) => {
+      const line = `[${ts()}] ${msg}`
+      console.log(`[AGENT][${job.id.slice(-6)}] ${msg}`)
+      await this.sendLog(job.id, line)
+    }
+
     // Notifica inizio
-    await fetch(`${this.config.platformUrl}/api/agent/jobs/${job.id}/start`, {
+    const startRes = await fetch(`${this.config.platformUrl}/api/agent/jobs/${job.id}/start`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.config.agentToken}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${this.config.agentToken}`, "Content-Type": "application/json" },
     })
+    if (!startRes.ok) {
+      const d = await startRes.json() as any
+      console.error(`[AGENT] Start rifiutato: ${d.error}`)
+      return
+    }
+
+    await log(`Avvio job ${job.type} su ${job.targets.length} target: ${job.targets.join(", ")}`)
 
     try {
-      const findings = await executeJob(job)
+      const findings = await executeJob(job, log)
 
-      // Push risultati
+      await log(`Completato. ${findings.length} finding trovati.`)
+
       await fetch(`${this.config.platformUrl}/api/agent/jobs/${job.id}/results`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.config.agentToken}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${this.config.agentToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ status: "COMPLETED", findings }),
       })
 
       console.log(`[AGENT] Job ${job.id} completato: ${findings.length} finding`)
     } catch (err: any) {
+      await log(`Errore: ${err.message}`)
       await fetch(`${this.config.platformUrl}/api/agent/jobs/${job.id}/results`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.config.agentToken}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${this.config.agentToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ status: "FAILED", error: err.message }),
       })
       console.error(`[AGENT] Job ${job.id} fallito:`, err.message)

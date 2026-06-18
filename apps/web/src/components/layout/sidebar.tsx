@@ -13,6 +13,7 @@ import {
   Settings,
   Shield,
   LogOut,
+  ScanLine,
 } from "lucide-react"
 import { signOut, useSession } from "next-auth/react"
 import { cn, getInitials } from "@/lib/utils"
@@ -25,6 +26,7 @@ const navItems = [
   { href: "/assets", label: "Asset", icon: Server },
   { href: "/assessments", label: "Assessment", icon: Target },
   { href: "/findings", label: "Findings", icon: Bug },
+  { href: "/jobs", label: "Scan Jobs", icon: ScanLine },
   { href: "/reports", label: "Report", icon: FileText },
   { href: "/agents", label: "Agent Interni", icon: Bot },
 ]
