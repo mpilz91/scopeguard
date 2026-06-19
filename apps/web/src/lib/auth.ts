@@ -39,6 +39,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name ?? user.email,
           organizationId: membership?.organizationId ?? null,
           organizationSlug: membership?.organization?.slug ?? null,
+          orgType: membership?.organization?.orgType ?? null,
           role: membership?.role ?? null,
         }
       },
@@ -50,6 +51,7 @@ export const authOptions: NextAuthOptions = {
         token.userId = user.id
         token.organizationId = (user as any).organizationId
         token.organizationSlug = (user as any).organizationSlug
+        token.orgType = (user as any).orgType
         token.role = (user as any).role
       }
       return token
@@ -58,6 +60,7 @@ export const authOptions: NextAuthOptions = {
       session.user.id = token.userId as string
       session.user.organizationId = (token.organizationId as string) ?? null
       session.user.organizationSlug = (token.organizationSlug as string) ?? null
+      session.user.orgType = (token.orgType as string) ?? null
       session.user.role = (token.role as string) ?? null
       return session
     },
@@ -81,5 +84,12 @@ export async function requireAuth() {
 export async function requireOrg() {
   const session = await requireAuth()
   if (!session.user.organizationId) throw new Error("NO_ORGANIZATION")
+  return session
+}
+
+export async function requirePlatformAdmin() {
+  const session = await requireAuth()
+  if (session.user.orgType !== "PLATFORM") throw new Error("PLATFORM_ADMIN_REQUIRED")
+  if (!["OWNER", "ADMIN"].includes(session.user.role ?? "")) throw new Error("PLATFORM_ADMIN_REQUIRED")
   return session
 }

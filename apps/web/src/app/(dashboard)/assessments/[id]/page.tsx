@@ -6,7 +6,7 @@ import Link from "next/link"
 import {
   ArrowLeft, Plus, Trash2, Shield, CheckCircle,
   AlertTriangle, Server, Bug, Loader2, FileText, Edit3,
-  Play, RefreshCw, Clock, XCircle, Ban,
+  Play, RefreshCw, Clock, XCircle, Ban, Network, ChevronDown, ChevronUp,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -233,8 +233,11 @@ export default function AssessmentDetailPage() {
 
   const [assessment, setAssessment] = useState<any>(null)
   const [availableAssets, setAvailableAssets] = useState<any[]>([])
+  const [discoveredHosts, setDiscoveredHosts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [roeTab, setRoeTab] = useState<"edit" | "preview">("edit")
+  const [expandedHost, setExpandedHost] = useState<string | null>(null)
+  const [promotingHost, setPromotingHost] = useState<string | null>(null)
 
   // Separate states — avoids cross-disabling between save and approve
   const [scopeAssetId, setScopeAssetId] = useState("")
@@ -261,10 +264,14 @@ export default function AssessmentDetailPage() {
       setAssessment(data)
       if (data.roe?.content) setRoeContent(data.roe.content)
 
-      const ar = await fetch(`/api/assets?customerId=${data.customerId}`)
+      const [ar, hr] = await Promise.all([
+        fetch(`/api/assets?customerId=${data.customerId}`),
+        fetch(`/api/assessments/${params.id}/discovered-hosts`),
+      ])
       const allAssets = await ar.json()
       const scopedIds = new Set(data.scopeItems?.map((s: any) => s.assetId))
       setAvailableAssets(allAssets.filter((a: any) => !scopedIds.has(a.id)))
+      if (hr.ok) setDiscoveredHosts(await hr.json())
     } finally {
       setLoading(false)
     }
@@ -359,6 +366,22 @@ export default function AssessmentDetailPage() {
       }
     } finally {
       setLaunchingJob(false)
+    }
+  }
+
+  async function promoteHost(hostId: string) {
+    setPromotingHost(hostId)
+    try {
+      const res = await fetch(`/api/assessments/${params.id}/discovered-hosts/${hostId}/promote`, { method: "POST" })
+      const d = await res.json()
+      if (!res.ok) {
+        toast({ variant: "destructive", title: "Errore promozione", description: d.error })
+        return
+      }
+      await load()
+      toast({ title: "Host promosso ad Asset", description: `Asset ${d.value} creato con successo.` })
+    } finally {
+      setPromotingHost(null)
     }
   }
 
@@ -763,6 +786,105 @@ export default function AssessmentDetailPage() {
             </Card>
           )}
 
+          {/* ── Discovered Hosts (risultato Discovery scan) ── */}
+          {discoveredHosts.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-1.5 text-sm font-semibold">
+                  <Network className="h-4 w-4" />
+                  Host Scoperti
+                  <Badge variant="secondary" className="ml-1">{discoveredHosts.length}</Badge>
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Risultati della fase di Asset Discovery. Promuovi un host per aggiungerlo agli Asset del cliente.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>IP Address</TableHead>
+                      <TableHead>Hostname</TableHead>
+                      <TableHead>Porte Aperte</TableHead>
+                      <TableHead>Scoperto il</TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {discoveredHosts.map((h: any) => {
+                      const ports: any[] = Array.isArray(h.openPorts) ? h.openPorts : []
+                      const isExpanded = expandedHost === h.id
+                      const HIGH_RISK = [21, 23, 135, 137, 138, 139, 445, 1433, 3306, 3389, 5432, 6379, 27017]
+                      return (
+                        <>
+                          <TableRow key={h.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedHost(isExpanded ? null : h.id)}>
+                            <TableCell className="font-mono font-medium">{h.ipAddress}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{h.hostname ?? "—"}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {ports.slice(0, 6).map((p: any, i: number) => (
+                                  <Badge
+                                    key={i}
+                                    variant={HIGH_RISK.includes(parseInt(p.port)) ? "destructive" : "secondary"}
+                                    className="text-xs font-mono"
+                                  >
+                                    {p.port}/{p.protocol}
+                                  </Badge>
+                                ))}
+                                {ports.length > 6 && (
+                                  <Badge variant="outline" className="text-xs">+{ports.length - 6}</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{formatDate(h.createdAt)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs"
+                                  onClick={(e) => { e.stopPropagation(); promoteHost(h.id) }}
+                                  disabled={promotingHost === h.id}
+                                >
+                                  {promotingHost === h.id
+                                    ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                    : <Plus className="mr-1 h-3 w-3" />}
+                                  Promuovi ad Asset
+                                </Button>
+                                {isExpanded
+                                  ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                  : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && (
+                            <TableRow key={`${h.id}-exp`}>
+                              <TableCell colSpan={5} className="bg-muted/30 p-3">
+                                <p className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+                                  Dettaglio porte ({ports.length})
+                                </p>
+                                <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-4">
+                                  {ports.map((p: any, i: number) => (
+                                    <div key={i} className="flex items-center gap-2 text-xs rounded border bg-background px-2 py-1">
+                                      <span className={`font-mono font-bold ${HIGH_RISK.includes(parseInt(p.port)) ? "text-destructive" : "text-foreground"}`}>
+                                        {p.port}/{p.protocol}
+                                      </span>
+                                      <span className="text-muted-foreground truncate">{p.service ?? "—"}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
           {/* ── Findings ── */}
           {(assessment.findings?.length ?? 0) > 0 && (
             <Card>
@@ -864,6 +986,12 @@ export default function AssessmentDetailPage() {
                 <span className="text-muted-foreground">Finding</span>
                 <Badge variant={(assessment.findings?.length ?? 0) > 0 ? "destructive" : "secondary"}>
                   {assessment.findings?.length ?? 0}
+                </Badge>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Host scoperti</span>
+                <Badge variant={discoveredHosts.length > 0 ? "default" : "secondary"}>
+                  {discoveredHosts.length}
                 </Badge>
               </div>
               <div className="flex justify-between items-center">

@@ -51,25 +51,50 @@ export async function processNmapJob(payload: {
       const parsed = parseNmapOutput(stdout, target)
       results.push(...parsed.hosts)
 
-      // Salva findings per porte aperte rilevanti
-      for (const host of parsed.hosts) {
-        for (const port of (host.ports as any[]) ?? []) {
-          if (port.state === "open") {
-            await prisma.finding.create({
-              data: {
-                assessmentId,
-                scanJobId,
-                organizationId,
-                title: `Porta ${port.port}/${port.protocol} aperta su ${host.ip}`,
-                severity: getPortSeverity(port.port),
-                status: "OPEN",
-                description: `Il servizio ${port.service ?? "sconosciuto"} è raggiungibile sulla porta ${port.port}.`,
-                affectedAsset: host.ip as string,
-                port: parseInt(port.port),
-                protocol: port.protocol,
-                metadata: { nmapOutput: port },
-              },
-            })
+      if (config.scanType === "DISCOVERY") {
+        // Fase mappatura: crea DiscoveredHost, nessun Finding
+        for (const host of parsed.hosts) {
+          const openPorts = (host.ports as any[])?.filter((p) => p.state === "open") ?? []
+          await prisma.discoveredHost.upsert({
+            where: {
+              scanJobId_ipAddress: { scanJobId, ipAddress: host.ip as string },
+            },
+            create: {
+              scanJobId,
+              assessmentId,
+              organizationId,
+              ipAddress: host.ip as string,
+              openPorts,
+              rawOutput: { ports: host.ports },
+            },
+            update: {
+              openPorts,
+              rawOutput: { ports: host.ports },
+              updatedAt: new Date(),
+            },
+          })
+        }
+      } else {
+        // Fase vulnerabilità (FULL / VULN): crea Findings per porte aperte
+        for (const host of parsed.hosts) {
+          for (const port of (host.ports as any[]) ?? []) {
+            if (port.state === "open") {
+              await prisma.finding.create({
+                data: {
+                  assessmentId,
+                  scanJobId,
+                  organizationId,
+                  title: `Porta ${port.port}/${port.protocol} aperta su ${host.ip}`,
+                  severity: getPortSeverity(port.port),
+                  status: "OPEN",
+                  description: `Il servizio ${port.service ?? "sconosciuto"} è raggiungibile sulla porta ${port.port}.`,
+                  affectedAsset: host.ip as string,
+                  port: parseInt(port.port),
+                  protocol: port.protocol,
+                  metadata: { nmapOutput: port },
+                },
+              })
+            }
           }
         }
       }

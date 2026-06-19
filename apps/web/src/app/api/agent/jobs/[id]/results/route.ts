@@ -82,7 +82,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           port: f.port,
           protocol: f.protocol,
           cve: f.cve,
-          metadata: f.metadata,
+          metadata: f.metadata as any,
         })),
       })
     }

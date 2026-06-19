@@ -30,6 +30,20 @@ export type AuditAction =
   | "REPORT_GENERATED"
   | "AGENT_TOKEN_CREATED"
   | "AGENT_TOKEN_REVOKED"
+  | "ORGANIZATION_CREATED"
+  | "ORGANIZATION_UPDATED"
+  | "ORGANIZATION_DELETED"
+  | "SERVICE_TYPE_CREATED"
+  | "SERVICE_TYPE_UPDATED"
+  | "SERVICE_TYPE_DELETED"
+  | "CONTRACT_CREATED"
+  | "CONTRACT_UPDATED"
+  | "CONTRACT_DELETED"
+  | "CLIENT_CREATED"
+  | "HOST_PROMOTED_TO_ASSET"
+  | "SCAN_TYPE_DEF_CREATED"
+  | "SCAN_TYPE_DEF_UPDATED"
+  | "SCAN_TYPE_DEF_DELETED"
 
 export interface AuditParams {
   organizationId: string
@@ -51,7 +65,7 @@ export async function audit(params: AuditParams): Promise<void> {
         action: params.action,
         resource: params.resource,
         resourceId: params.resourceId,
-        metadata: params.metadata,
+        metadata: params.metadata as any,
         ipAddress: params.ipAddress,
         userAgent: params.userAgent,
       },

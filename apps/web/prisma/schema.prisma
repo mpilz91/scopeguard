@@ -9,25 +9,38 @@ datasource db {
 
 // ─── TENANT ──────────────────────────────────────────────────────────────────
 
+enum OrgType {
+  PLATFORM
+  RESELLER
+  CLIENT
+}
+
 model Organization {
   id          String   @id @default(cuid())
   name        String
   slug        String   @unique
+  orgType     OrgType  @default(CLIENT)
+  parentId    String?
   logoUrl     String?
   website     String?
   vatNumber   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  memberships Membership[]
-  customers   Customer[]
-  assets      Asset[]
-  assessments Assessment[]
-  agentTokens AgentToken[]
-  scanJobs    ScanJob[]
-  findings    Finding[]
-  reports     Report[]
-  auditLogs   AuditLog[]
+  parent      Organization?  @relation("OrgHierarchy", fields: [parentId], references: [id])
+  children    Organization[] @relation("OrgHierarchy")
+
+  memberships     Membership[]
+  customers       Customer[]
+  assets          Asset[]
+  assessments     Assessment[]
+  agentTokens     AgentToken[]
+  scanJobs        ScanJob[]
+  findings        Finding[]
+  reports         Report[]
+  auditLogs       AuditLog[]
+  contracts       ServiceContract[]
+  discoveredHosts DiscoveredHost[]
 
   @@map("organizations")
 }
@@ -40,9 +53,9 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  memberships       Membership[]
-  auditLogs         AuditLog[]
-  roeApprovals      RulesOfEngagement[] @relation("RoeApprovedBy")
+  memberships  Membership[]
+  auditLogs    AuditLog[]
+  roeApprovals RulesOfEngagement[] @relation("RoeApprovedBy")
 
   @@map("users")
 }
@@ -67,6 +80,59 @@ enum MembershipRole {
   ADMIN
   PENTESTER
   VIEWER
+}
+
+// ─── SERVICE CATALOG ─────────────────────────────────────────────────────────
+
+model ScanTypeDef {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String?
+  scanJobType   String   // valore dell'enum ScanType: NMAP_DISCOVERY, NMAP_FULL, ecc.
+  defaultConfig Json     @default("{}")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  serviceTypes  ServiceType[]
+
+  @@map("scan_type_defs")
+}
+
+model ServiceType {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contracts    ServiceContract[]
+  assessments  Assessment[]
+  scanTypeDefs ScanTypeDef[]
+
+  @@map("service_types")
+}
+
+model ServiceContract {
+  id              String    @id @default(cuid())
+  organizationId  String
+  serviceTypeId   String
+  maxAssessments  Int?
+  maxAssets       Int?
+  expiresAt       DateTime?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  serviceType  ServiceType  @relation(fields: [serviceTypeId], references: [id])
+
+  @@unique([organizationId, serviceTypeId])
+  @@index([organizationId])
+  @@map("service_contracts")
 }
 
 // ─── CUSTOMER & ASSET ────────────────────────────────────────────────────────
@@ -130,18 +196,21 @@ model Assessment {
   status         AssessmentStatus @default(DRAFT)
   organizationId String
   customerId     String
+  serviceTypeId  String?
   startDate      DateTime?
   endDate        DateTime?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer     Customer          @relation(fields: [customerId], references: [id])
-  scopeItems   ScopeItem[]
-  roe          RulesOfEngagement?
-  scanJobs     ScanJob[]
-  findings     Finding[]
-  reports      Report[]
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer        Customer           @relation(fields: [customerId], references: [id])
+  serviceType     ServiceType?       @relation(fields: [serviceTypeId], references: [id])
+  scopeItems      ScopeItem[]
+  roe             RulesOfEngagement?
+  scanJobs        ScanJob[]
+  findings        Finding[]
+  reports         Report[]
+  discoveredHosts DiscoveredHost[]
 
   @@index([organizationId])
   @@index([customerId])
@@ -225,10 +294,11 @@ model ScanJob {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  assessment   Assessment  @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  organization Organization @relation(fields: [organizationId], references: [id])
-  agentToken   AgentToken?  @relation(fields: [agentTokenId], references: [id])
-  findings     Finding[]
+  assessment      Assessment       @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  organization    Organization     @relation(fields: [organizationId], references: [id])
+  agentToken      AgentToken?      @relation(fields: [agentTokenId], references: [id])
+  findings        Finding[]
+  discoveredHosts DiscoveredHost[]
 
   @@index([organizationId])
   @@index([assessmentId])
@@ -251,6 +321,30 @@ enum JobStatus {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+// ─── DISCOVERED HOSTS (risultato fase discovery) ──────────────────────────────
+
+model DiscoveredHost {
+  id             String   @id @default(cuid())
+  scanJobId      String
+  assessmentId   String
+  organizationId String
+  ipAddress      String
+  hostname       String?
+  osInfo         String?
+  openPorts      Json
+  rawOutput      Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  scanJob      ScanJob      @relation(fields: [scanJobId], references: [id], onDelete: Cascade)
+  assessment   Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([scanJobId, ipAddress])
+  @@index([assessmentId])
+  @@map("discovered_hosts")
 }
 
 // ─── FINDINGS ────────────────────────────────────────────────────────────────
