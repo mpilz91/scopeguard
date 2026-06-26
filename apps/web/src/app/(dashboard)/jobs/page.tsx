@@ -25,12 +25,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 }
 
 const SCAN_LABEL: Record<string, string> = {
-  NMAP_DISCOVERY: "Discovery",
-  NMAP_FULL:      "Port Scan completo",
-  NMAP_VULN:      "Vulnerability Scan",
-  NUCLEI_CVE:     "CVE Scan (Nuclei)",
-  NUCLEI_WEBAPP:  "Web App Scan",
-  MANUAL:         "Manuale",
+  NMAP:   "Nmap",
+  NUCLEI: "Nuclei",
+  MANUAL: "Manuale",
 }
 
 // ── Log viewer ────────────────────────────────────────────────────────────────

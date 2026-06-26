@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-import { requireOrg } from "@/lib/auth"
+import { requireOrg, requireOperator } from "@/lib/auth"
 import { z } from "zod"
 import { audit } from "@/lib/audit"
 
 const createJobSchema = z.object({
-  type: z.enum(["NMAP_DISCOVERY", "NMAP_FULL", "NMAP_VULN", "NUCLEI_CVE", "NUCLEI_WEBAPP", "MANUAL"]),
-  config: z.record(z.unknown()).optional(),
+  scanTypeDefId: z.string().cuid("scanTypeDefId non valido"),
 })
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
@@ -26,7 +25,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const session = await requireOrg()
+    const session = await requireOperator()
     const orgId = session.user.organizationId!
 
     const assessment = await prisma.assessment.findFirst({
@@ -59,6 +58,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     // Assign to first active agent token for this org
+    const scanTypeDef = await prisma.scanTypeDef.findFirst({
+      where: { id: result.data.scanTypeDefId, isActive: true },
+    })
+    if (!scanTypeDef) {
+      return NextResponse.json({ error: "Tipo di scansione non trovato o non attivo" }, { status: 404 })
+    }
+
     const agentToken = await prisma.agentToken.findFirst({
       where: { organizationId: orgId, status: "ACTIVE" },
       orderBy: { createdAt: "asc" },
@@ -68,8 +74,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       data: {
         assessmentId: params.id,
         organizationId: orgId,
-        type: result.data.type,
-        config: (result.data.config ?? {}) as any,
+        type: scanTypeDef.engine as any,
+        config: scanTypeDef.defaultConfig as any,
         status: "PENDING",
         agentTokenId: agentToken?.id ?? null,
       },
@@ -89,7 +95,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       action: "SCAN_JOB_CREATED",
       resource: "scan_job",
       resourceId: job.id,
-      metadata: { type: result.data.type, agentTokenId: agentToken?.id ?? null },
+      metadata: { engine: scanTypeDef.engine, scanTypeDefId: scanTypeDef.id, agentTokenId: agentToken?.id ?? null },
     })
 
     return NextResponse.json(

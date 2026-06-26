@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-import { requireOrg } from "@/lib/auth"
+import { requireOrg, requireOperator } from "@/lib/auth"
 import { audit } from "@/lib/audit"
 
 const CANCELLABLE = ["PENDING", "QUEUED", "RUNNING"]
@@ -25,7 +25,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 
 export async function PATCH(_: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const session = await requireOrg()
+    const session = await requireOperator()
     const orgId = session.user.organizationId!
 
     const job = await prisma.scanJob.findFirst({

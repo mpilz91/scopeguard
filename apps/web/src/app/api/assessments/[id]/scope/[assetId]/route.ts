@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-import { requireOrg } from "@/lib/auth"
+import { requireOperator } from "@/lib/auth"
 import { audit } from "@/lib/audit"
 
 export async function DELETE(
@@ -8,7 +8,7 @@ export async function DELETE(
   { params }: { params: { id: string; assetId: string } }
 ) {
   try {
-    const session = await requireOrg()
+    const session = await requireOperator()
     const orgId = session.user.organizationId!
 
     const assessment = await prisma.assessment.findFirst({

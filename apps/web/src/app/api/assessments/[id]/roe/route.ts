@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-import { requireOrg } from "@/lib/auth"
+import { requireOperator } from "@/lib/auth"
 import { z } from "zod"
 import { audit } from "@/lib/audit"
 
@@ -10,7 +10,7 @@ const roeSchema = z.object({
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const session = await requireOrg()
+    const session = await requireOperator()
     const orgId = session.user.organizationId!
 
     const assessment = await prisma.assessment.findFirst({

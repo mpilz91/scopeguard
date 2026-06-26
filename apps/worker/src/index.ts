@@ -31,24 +31,19 @@ const worker = new Worker(
       return
     }
 
+    const scanType = (config as any).mode ?? "FULL"
     switch (type) {
-      case "NMAP_DISCOVERY":
-        await processNmapJob({ scanJobId, organizationId, assessmentId, targets, config: { ...config, scanType: "DISCOVERY" } })
+      case "NMAP":
+        await processNmapJob({ scanJobId, organizationId, assessmentId, targets, config: { ...config, scanType } })
         break
-      case "NMAP_FULL":
-        await processNmapJob({ scanJobId, organizationId, assessmentId, targets, config: { ...config, scanType: "FULL" } })
+      case "NUCLEI":
+        await processNucleiJob({ scanJobId, organizationId, assessmentId, targets, config })
         break
-      case "NMAP_VULN":
-        await processNmapJob({ scanJobId, organizationId, assessmentId, targets, config: { ...config, scanType: "VULN" } })
-        break
-      case "NUCLEI_CVE":
-        await processNucleiJob({ scanJobId, organizationId, assessmentId, targets, config: { ...config, templates: ["cves"] } })
-        break
-      case "NUCLEI_WEBAPP":
-        await processNucleiJob({ scanJobId, organizationId, assessmentId, targets, config: { ...config, templates: ["exposures", "misconfiguration", "technologies"] } })
+      case "MANUAL":
+        await prisma.scanJob.update({ where: { id: scanJobId }, data: { status: "COMPLETED", completedAt: new Date() } })
         break
       default:
-        throw new Error(`Tipo di scan non supportato: ${type}`)
+        throw new Error(`Engine non supportato: ${type}`)
     }
 
     console.log(`[WORKER] Job completato: ${scanJobId}`)

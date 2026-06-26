@@ -17,7 +17,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     const st = await prisma.serviceType.findUnique({
       where: { id: params.id },
       include: {
-        scanTypeDefs: { select: { id: true, name: true, slug: true, scanJobType: true } },
+        scanTypeDefs: { select: { id: true, name: true, slug: true, engine: true } },
         contracts: { include: { organization: { select: { id: true, name: true, slug: true } } } },
         _count: { select: { assessments: true } },
       },
@@ -50,7 +50,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const updated = await prisma.serviceType.update({
       where: { id: params.id },
       data: updateData,
-      include: { scanTypeDefs: { select: { id: true, name: true, slug: true, scanJobType: true } } },
+      include: { scanTypeDefs: { select: { id: true, name: true, slug: true, engine: true } } },
     })
 
     await audit({

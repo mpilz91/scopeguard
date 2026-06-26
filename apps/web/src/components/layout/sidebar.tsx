@@ -124,25 +124,36 @@ export function Sidebar() {
           </>
         )}
 
-        {/* Standard nav — only for non-platform orgs */}
-        {session?.user?.orgType !== "PLATFORM" && navItems.map(({ href, label, icon: Icon }) => {
-          const active = pathname.startsWith(href)
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                active
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {label}
-            </Link>
-          )
-        })}
+        {/* Standard nav — PLATFORM e RESELLER vedono il nav operativo, CLIENT solo le pagine di lettura */}
+        {(() => {
+          const orgType = session?.user?.orgType
+          const clientOnly = new Set(["/dashboard", "/assets", "/assessments", "/findings", "/reports"])
+          // PLATFORM gestisce i clienti via /admin/organizations, non via /customers
+          const platformExcluded = new Set(["/customers"])
+          const visible = orgType === "CLIENT"
+            ? navItems.filter(i => clientOnly.has(i.href))
+            : orgType === "PLATFORM"
+            ? navItems.filter(i => !platformExcluded.has(i.href))
+            : navItems
+          return visible.map(({ href, label, icon: Icon }) => {
+            const active = pathname.startsWith(href)
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {label}
+              </Link>
+            )
+          })
+        })()}
       </nav>
 
       <Separator />

@@ -89,7 +89,7 @@ model ScanTypeDef {
   name          String
   slug          String   @unique
   description   String?
-  scanJobType   String   // valore dell'enum ScanType: NMAP_DISCOVERY, NMAP_FULL, ecc.
+  engine        String   // "NMAP" | "NUCLEI" | "MANUAL"
   defaultConfig Json     @default("{}")
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
@@ -306,11 +306,8 @@ model ScanJob {
 }
 
 enum ScanType {
-  NMAP_DISCOVERY
-  NMAP_FULL
-  NMAP_VULN
-  NUCLEI_CVE
-  NUCLEI_WEBAPP
+  NMAP
+  NUCLEI
   MANUAL
 }
 

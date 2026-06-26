@@ -11,12 +11,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 
-const JOB_TYPES = [
-  { value: "NMAP_DISCOVERY", label: "NMAP Discovery", desc: "Host discovery — individua host attivi, nessuna porta scansionata" },
-  { value: "NMAP_FULL", label: "NMAP Full", desc: "Port scan completo con rilevamento servizi e versioni" },
-  { value: "NMAP_VULN", label: "NMAP Vuln", desc: "Script NSE per vulnerabilità note (lento, invasivo)" },
-  { value: "NUCLEI_CVE", label: "Nuclei CVE", desc: "Template Nuclei per CVE — severità critical/high/medium" },
-  { value: "NUCLEI_WEBAPP", label: "Nuclei Web App", desc: "Misconfiguration, esposizioni e tecnologie web" },
+const ENGINES = [
+  { value: "NMAP",   label: "Nmap",    desc: "Scanner di rete (port scan, discovery, vuln scripts)" },
+  { value: "NUCLEI", label: "Nuclei",  desc: "Scanner basato su template (CVE, misconfigurazioni, web)" },
   { value: "MANUAL", label: "Manuale", desc: "Finding inseriti manualmente dall'analista" },
 ]
 
@@ -30,7 +27,7 @@ export default function EditScanTypeDefPage() {
   const [form, setForm] = useState({
     name: "",
     description: "",
-    scanJobType: "",
+    engine: "",
     defaultConfig: "{}",
     isActive: true,
   })
@@ -43,7 +40,7 @@ export default function EditScanTypeDefPage() {
           setForm({
             name: data.name ?? "",
             description: data.description ?? "",
-            scanJobType: data.scanJobType ?? "",
+            engine: data.engine ?? "",
             defaultConfig: JSON.stringify(data.defaultConfig ?? {}, null, 2),
             isActive: data.isActive ?? true,
           })
@@ -78,7 +75,7 @@ export default function EditScanTypeDefPage() {
         body: JSON.stringify({
           name: form.name,
           description: form.description || null,
-          scanJobType: form.scanJobType || undefined,
+          engine: form.engine || undefined,
           defaultConfig: parsedConfig,
           isActive: form.isActive,
         }),
@@ -133,23 +130,23 @@ export default function EditScanTypeDefPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Job Type</Label>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {JOB_TYPES.map(({ value, label, desc }) => {
-                    const selected = form.scanJobType === value
+                <Label>Engine</Label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {ENGINES.map(({ value, label, desc }) => {
+                    const selected = form.engine === value
                     return (
                       <button
                         key={value}
                         type="button"
-                        onClick={() => setForm((f) => ({ ...f, scanJobType: value }))}
-                        className={`flex flex-col items-start rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                        onClick={() => setForm((f) => ({ ...f, engine: value }))}
+                        className={`flex flex-col items-start rounded-md border px-3 py-2.5 text-left text-sm transition-colors ${
                           selected
                             ? "border-primary bg-primary/5 text-primary"
                             : "border-border hover:border-primary/40 hover:bg-muted"
                         }`}
                       >
-                        <span className="font-medium">{label}</span>
-                        <span className={`text-xs ${selected ? "text-primary/70" : "text-muted-foreground"}`}>{desc}</span>
+                        <span className="font-semibold">{label}</span>
+                        <span className={`mt-0.5 text-xs leading-snug ${selected ? "text-primary/70" : "text-muted-foreground"}`}>{desc}</span>
                       </button>
                     )
                   })}
@@ -168,6 +165,9 @@ export default function EditScanTypeDefPage() {
                   className="font-mono text-xs"
                 />
                 {configError && <p className="text-xs text-destructive">{configError}</p>}
+                <p className="text-xs text-muted-foreground">
+                  Per Nmap: <code className="bg-muted px-1 rounded">mode</code> (DISCOVERY | FULL | VULN). Per Nuclei: <code className="bg-muted px-1 rounded">templates</code> (array di stringhe).
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <button

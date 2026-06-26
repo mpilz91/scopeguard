@@ -38,6 +38,7 @@ export const assessmentSchema = z.object({
   description: z.string().optional(),
   type: z.enum(["EXTERNAL", "INTERNAL", "WEBAPP", "RETEST"]),
   customerId: z.string().cuid("Customer ID non valido"),
+  serviceTypeId: z.string().cuid().optional().nullable(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 })

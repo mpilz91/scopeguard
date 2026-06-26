@@ -4,12 +4,12 @@ import { requirePlatformAdmin } from "@/lib/auth"
 import { z } from "zod"
 import { audit } from "@/lib/audit"
 
-const VALID_JOB_TYPES = ["NMAP_DISCOVERY", "NMAP_FULL", "NMAP_VULN", "NUCLEI_CVE", "NUCLEI_WEBAPP", "MANUAL"]
+const VALID_ENGINES = ["NMAP", "NUCLEI", "MANUAL"] as const
 
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
   description: z.string().nullable().optional(),
-  scanJobType: z.enum(VALID_JOB_TYPES as [string, ...string[]]).optional(),
+  engine: z.enum(VALID_ENGINES).optional(),
   defaultConfig: z.record(z.unknown()).optional(),
   isActive: z.boolean().optional(),
 })

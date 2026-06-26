@@ -29,15 +29,14 @@ export interface AgentFinding {
 export async function executeJob(job: AgentJob, log: LogFn = () => {}): Promise<AgentFinding[]> {
   const { type, targets, config } = job
   switch (type) {
-    case "NMAP_DISCOVERY":
-    case "NMAP_FULL":
-    case "NMAP_VULN":
-      return runNmap(targets, type, config, log)
-    case "NUCLEI_CVE":
-    case "NUCLEI_WEBAPP":
-      return runNuclei(targets, type, config, log)
+    case "NMAP":
+      return runNmap(targets, (config.mode as string) ?? "FULL", config, log)
+    case "NUCLEI":
+      return runNuclei(targets, (config.templates as string[]) ?? ["cves"], config, log)
+    case "MANUAL":
+      return []
     default:
-      throw new Error(`Tipo job non supportato: ${type}`)
+      throw new Error(`Engine non supportato: ${type}`)
   }
 }
 
@@ -45,7 +44,7 @@ export async function executeJob(job: AgentJob, log: LogFn = () => {}): Promise<
 
 async function runNmap(
   targets: string[],
-  type: string,
+  mode: string,
   _config: Record<string, unknown>,
   log: LogFn
 ): Promise<AgentFinding[]> {
@@ -54,11 +53,11 @@ async function runNmap(
   for (const target of targets) {
     const args: string[] = ["-T4", "-oX", "-", "--open"]
 
-    if (type === "NMAP_DISCOVERY") {
+    if (mode === "DISCOVERY") {
       args.push("-F", "-sV", "--version-intensity", "2")
-    } else if (type === "NMAP_FULL") {
+    } else if (mode === "FULL") {
       args.push("-sV", "-sC", "-p-")
-    } else if (type === "NMAP_VULN") {
+    } else if (mode === "VULN") {
       args.push("-sV", "--script=vuln,safe")
     }
 
@@ -104,13 +103,13 @@ async function runNmap(
           affectedAsset: hostIp,
           port,
           protocol,
-          metadata: { service, product, version, scanType: type, originalTarget: target },
+          metadata: { service, product, version, mode, originalTarget: target },
         })
         portCount++
       }
 
-      // Script NSE (NMAP_VULN)
-      if (type === "NMAP_VULN") {
+      // Script NSE (VULN mode)
+      if (mode === "VULN") {
         const scriptRegex = /<script id="([^"]+)"[^>]*output="([^"]+)"/g
         while ((match = scriptRegex.exec(block)) !== null) {
           const [, scriptId, output] = match
@@ -140,12 +139,11 @@ async function runNmap(
 
 async function runNuclei(
   targets: string[],
-  type: string,
+  templates: string[],
   _config: Record<string, unknown>,
   log: LogFn
 ): Promise<AgentFinding[]> {
   const findings: AgentFinding[] = []
-  const templates = type === "NUCLEI_CVE" ? ["cves"] : ["exposures", "misconfiguration"]
   const args: string[] = ["-jsonl", "-silent", "-no-interactsh"]
   for (const t of templates) args.push("-t", t)
   for (const target of targets) args.push("-u", target)

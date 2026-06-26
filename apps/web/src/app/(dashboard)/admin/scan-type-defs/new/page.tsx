@@ -11,13 +11,25 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 
-const JOB_TYPES = [
-  { value: "NMAP_DISCOVERY", label: "NMAP Discovery", desc: "Host discovery — individua host attivi, nessuna porta scansionata" },
-  { value: "NMAP_FULL", label: "NMAP Full", desc: "Port scan completo con rilevamento servizi e versioni" },
-  { value: "NMAP_VULN", label: "NMAP Vuln", desc: "Script NSE per vulnerabilità note (lento, invasivo)" },
-  { value: "NUCLEI_CVE", label: "Nuclei CVE", desc: "Template Nuclei per CVE — severità critical/high/medium" },
-  { value: "NUCLEI_WEBAPP", label: "Nuclei Web App", desc: "Misconfiguration, esposizioni e tecnologie web" },
-  { value: "MANUAL", label: "Manuale", desc: "Finding inseriti manualmente dall'analista" },
+const ENGINES = [
+  {
+    value: "NMAP",
+    label: "Nmap",
+    desc: "Scanner di rete. Configurabile via defaultConfig: mode (DISCOVERY, FULL, VULN), timing, ports.",
+    configHint: '{"mode": "FULL", "timing": 3}',
+  },
+  {
+    value: "NUCLEI",
+    label: "Nuclei",
+    desc: "Scanner di vulnerabilità basato su template. Configurabile via defaultConfig: templates, severity, rateLimit.",
+    configHint: '{"templates": ["cves"], "severity": "critical,high,medium", "rateLimit": 50}',
+  },
+  {
+    value: "MANUAL",
+    label: "Manuale",
+    desc: "Nessuno strumento automatico. I finding vengono inseriti manualmente dall'analista.",
+    configHint: "{}",
+  },
 ]
 
 export default function NewScanTypeDefPage() {
@@ -29,7 +41,7 @@ export default function NewScanTypeDefPage() {
     name: "",
     slug: "",
     description: "",
-    scanJobType: "",
+    engine: "",
     defaultConfig: "{}",
     isActive: true,
   })
@@ -37,6 +49,12 @@ export default function NewScanTypeDefPage() {
   function handleNameChange(name: string) {
     const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")
     setForm((f) => ({ ...f, name, slug }))
+  }
+
+  function selectEngine(engine: string) {
+    const hint = ENGINES.find((e) => e.value === engine)?.configHint ?? "{}"
+    setForm((f) => ({ ...f, engine, defaultConfig: hint }))
+    setConfigError("")
   }
 
   function validateConfig(val: string) {
@@ -50,8 +68,8 @@ export default function NewScanTypeDefPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.scanJobType) {
-      toast({ title: "Errore", description: "Seleziona un job type", variant: "destructive" })
+    if (!form.engine) {
+      toast({ title: "Errore", description: "Seleziona un engine", variant: "destructive" })
       return
     }
     let parsedConfig: Record<string, unknown>
@@ -70,7 +88,7 @@ export default function NewScanTypeDefPage() {
           name: form.name,
           slug: form.slug,
           description: form.description || null,
-          scanJobType: form.scanJobType,
+          engine: form.engine,
           defaultConfig: parsedConfig,
           isActive: form.isActive,
         }),
@@ -104,7 +122,7 @@ export default function NewScanTypeDefPage() {
                   id="name"
                   value={form.name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="Es. Nmap Port Scan Completo"
+                  placeholder="Es. Port Scan Standard"
                   required
                 />
               </div>
@@ -114,7 +132,7 @@ export default function NewScanTypeDefPage() {
                   id="slug"
                   value={form.slug}
                   onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-                  placeholder="nmap-full"
+                  placeholder="port-scan-standard"
                   pattern="[a-z0-9-]+"
                   required
                 />
@@ -126,27 +144,27 @@ export default function NewScanTypeDefPage() {
                   value={form.description}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   rows={2}
-                  placeholder="Breve descrizione della scansione..."
+                  placeholder="Breve descrizione visibile al team..."
                 />
               </div>
               <div className="space-y-2">
-                <Label>Job Type *</Label>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {JOB_TYPES.map(({ value, label, desc }) => {
-                    const selected = form.scanJobType === value
+                <Label>Engine *</Label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {ENGINES.map(({ value, label, desc }) => {
+                    const selected = form.engine === value
                     return (
                       <button
                         key={value}
                         type="button"
-                        onClick={() => setForm((f) => ({ ...f, scanJobType: value }))}
-                        className={`flex flex-col items-start rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                        onClick={() => selectEngine(value)}
+                        className={`flex flex-col items-start rounded-md border px-3 py-2.5 text-left text-sm transition-colors ${
                           selected
                             ? "border-primary bg-primary/5 text-primary"
                             : "border-border hover:border-primary/40 hover:bg-muted"
                         }`}
                       >
-                        <span className="font-medium">{label}</span>
-                        <span className={`text-xs ${selected ? "text-primary/70" : "text-muted-foreground"}`}>{desc}</span>
+                        <span className="font-semibold">{label}</span>
+                        <span className={`mt-0.5 text-xs leading-snug ${selected ? "text-primary/70" : "text-muted-foreground"}`}>{desc}</span>
                       </button>
                     )
                   })}
@@ -161,12 +179,14 @@ export default function NewScanTypeDefPage() {
                     setForm((f) => ({ ...f, defaultConfig: e.target.value }))
                     validateConfig(e.target.value)
                   }}
-                  rows={3}
+                  rows={4}
                   className="font-mono text-xs"
-                  placeholder='{"timing": 3}'
+                  placeholder="{}"
                 />
                 {configError && <p className="text-xs text-destructive">{configError}</p>}
-                <p className="text-xs text-muted-foreground">Parametri passati all'agente come config di default per questo tipo di scan.</p>
+                <p className="text-xs text-muted-foreground">
+                  Parametri inviati all&apos;agente. Per Nmap: <code className="bg-muted px-1 rounded">mode</code> (DISCOVERY | FULL | VULN), <code className="bg-muted px-1 rounded">timing</code>, <code className="bg-muted px-1 rounded">ports</code>. Per Nuclei: <code className="bg-muted px-1 rounded">templates</code>, <code className="bg-muted px-1 rounded">rateLimit</code>.
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <button

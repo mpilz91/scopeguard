@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-import { requireOrg } from "@/lib/auth"
+import { requireOrg, requireOperator } from "@/lib/auth"
 import { audit } from "@/lib/audit"
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
@@ -15,6 +15,14 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
         scanJobs: { orderBy: { createdAt: "desc" }, take: 20 },
         findings: { orderBy: [{ severity: "asc" }, { createdAt: "desc" }], take: 50 },
         reports: true,
+        serviceType: {
+          include: {
+            scanTypeDefs: {
+              where: { isActive: true },
+              select: { id: true, name: true, description: true, engine: true, defaultConfig: true },
+            },
+          },
+        },
       },
     })
     if (!assessment) return NextResponse.json({ error: "Non trovato" }, { status: 404 })
@@ -26,7 +34,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const session = await requireOrg()
+    const session = await requireOperator()
     const existing = await prisma.assessment.findFirst({
       where: { id: params.id, organizationId: session.user.organizationId! },
     })

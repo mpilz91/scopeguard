@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-import { requireOrg } from "@/lib/auth"
+import { requireOrg, requireOperator } from "@/lib/auth"
 import { assessmentSchema } from "@/lib/validations"
 import { audit } from "@/lib/audit"
 
@@ -24,7 +24,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await requireOrg()
+    const session = await requireOperator()
     const body = await req.json()
     const result = assessmentSchema.safeParse(body)
     if (!result.success) {

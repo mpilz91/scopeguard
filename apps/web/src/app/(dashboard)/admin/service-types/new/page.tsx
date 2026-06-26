@@ -11,14 +11,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 
-const JOB_TYPE_LABELS: Record<string, string> = {
-  NMAP_DISCOVERY: "Discovery",
-  NMAP_FULL: "Nmap Full",
-  NMAP_VULN: "Nmap Vuln",
-  NUCLEI_CVE: "Nuclei CVE",
-  NUCLEI_WEBAPP: "Nuclei Web",
-  MANUAL: "Manuale",
-}
 
 export default function NewServiceTypePage() {
   const router = useRouter()
@@ -146,7 +138,7 @@ export default function NewServiceTypePage() {
                         >
                           <span className="font-medium">{def.name}</span>
                           <span className={`text-xs ${checked ? "text-primary/70" : "text-muted-foreground"}`}>
-                            {JOB_TYPE_LABELS[def.scanJobType] ?? def.scanJobType}
+                            {def.engine}
                             {def.description ? ` — ${def.description}` : ""}
                           </span>
                         </button>

@@ -18,17 +18,25 @@ export default function NewAssessmentPage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([])
+  const [serviceTypes, setServiceTypes] = useState<{ id: string; name: string; description?: string }[]>([])
   const [form, setForm] = useState({
     title: "",
     description: "",
     type: "EXTERNAL",
     customerId: searchParams.get("customerId") ?? "",
+    serviceTypeId: "",
     startDate: "",
     endDate: "",
   })
 
   useEffect(() => {
-    fetch("/api/customers").then((r) => r.json()).then(setCustomers)
+    Promise.all([
+      fetch("/api/customers").then((r) => r.json()),
+      fetch("/api/service-types").then((r) => r.json()),
+    ]).then(([c, s]) => {
+      setCustomers(Array.isArray(c) ? c : [])
+      setServiceTypes(Array.isArray(s) ? s : [])
+    })
   }, [])
 
   function set(key: string, value: string) {
@@ -42,7 +50,10 @@ export default function NewAssessmentPage() {
       const res = await fetch("/api/assessments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          serviceTypeId: form.serviceTypeId || null,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -86,6 +97,22 @@ export default function NewAssessmentPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo di Servizio</Label>
+                <Select value={form.serviceTypeId} onValueChange={(v) => set("serviceTypeId", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleziona tipo di servizio..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {serviceTypes.map((st) => (
+                      <SelectItem key={st.id} value={st.id}>{st.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Il tipo di servizio determina le scansioni disponibili nell&apos;assessment.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>Titolo *</Label>

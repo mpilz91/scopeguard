@@ -93,3 +93,9 @@ export async function requirePlatformAdmin() {
   if (!["OWNER", "ADMIN"].includes(session.user.role ?? "")) throw new Error("PLATFORM_ADMIN_REQUIRED")
   return session
 }
+
+export async function requireOperator() {
+  const session = await requireOrg()
+  if (session.user.orgType === "CLIENT") throw new Error("OPERATOR_REQUIRED")
+  return session
+}

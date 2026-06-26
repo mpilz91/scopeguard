@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
+import { useSession } from "next-auth/react"
 import { useToast } from "@/hooks/use-toast"
 import { formatDate, formatDateTime } from "@/lib/utils"
 
@@ -44,13 +45,11 @@ const SEVERITY_BADGE: Record<string, any> = {
   CRITICAL: "critical", HIGH: "high", MEDIUM: "medium", LOW: "low", INFO: "info",
 }
 
-const SCAN_TYPES: { value: string; label: string; description: string }[] = [
-  { value: "NMAP_DISCOVERY", label: "Discovery",          description: "Host discovery e porte principali (veloce)" },
-  { value: "NMAP_FULL",      label: "Port Scan completo", description: "Tutte le 65535 porte TCP/UDP" },
-  { value: "NMAP_VULN",      label: "Vulnerability Scan", description: "Script NSE per CVE e misconfigurazioni" },
-  { value: "NUCLEI_CVE",     label: "CVE Scan (Nuclei)",  description: "Template Nuclei per vulnerabilità note" },
-  { value: "NUCLEI_WEBAPP",  label: "Web App Scan",       description: "Template Nuclei per applicazioni web" },
-]
+const ENGINE_BADGE: Record<string, string> = {
+  NMAP:   "bg-blue-100 text-blue-800",
+  NUCLEI: "bg-purple-100 text-purple-800",
+  MANUAL: "bg-gray-100 text-gray-800",
+}
 
 const JOB_STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   PENDING:   { label: "In attesa",  color: "bg-slate-100 text-slate-700",  icon: <Clock className="h-3 w-3" /> },
@@ -230,6 +229,8 @@ export default function AssessmentDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
+  const { data: session } = useSession()
+  const isClient = session?.user?.orgType === "CLIENT"
 
   const [assessment, setAssessment] = useState<any>(null)
   const [availableAssets, setAvailableAssets] = useState<any[]>([])
@@ -247,7 +248,7 @@ export default function AssessmentDetailPage() {
   const [savingDraft, setSavingDraft] = useState(false)
   const [approvingRoe, setApprovingRoe] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
-  const [scanType, setScanType] = useState("NMAP_DISCOVERY")
+  const [scanTypeDefId, setScanTypeDefId] = useState("")
   const [launchingJob, setLaunchingJob] = useState(false)
   const [refreshingJobs, setRefreshingJobs] = useState(false)
   const [cancellingJob, setCancellingJob] = useState<string | null>(null)
@@ -345,12 +346,13 @@ export default function AssessmentDetailPage() {
   }
 
   async function launchScan() {
+    if (!scanTypeDefId) return
     setLaunchingJob(true)
     try {
       const res = await fetch(`/api/assessments/${params.id}/jobs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: scanType }),
+        body: JSON.stringify({ scanTypeDefId }),
       })
       const d = await res.json()
       if (!res.ok) { toast({ variant: "destructive", title: "Errore avvio scansione", description: d.error }); return }
@@ -467,7 +469,7 @@ export default function AssessmentDetailPage() {
           <span className={`rounded-md px-2.5 py-1 text-xs font-medium ${status.color}`}>
             {status.label}
           </span>
-          {status.next.length > 0 && (
+          {status.next.length > 0 && !isClient && (
             <Select onValueChange={updateStatus} disabled={updatingStatus}>
               <SelectTrigger className="h-8 w-44 text-xs">
                 <SelectValue placeholder="Cambia stato…" />
@@ -520,7 +522,7 @@ export default function AssessmentDetailPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {!locked && (
+              {!locked && !isClient && (
                 <div className="flex gap-2">
                   <Select value={scopeAssetId} onValueChange={setScopeAssetId}>
                     <SelectTrigger className="flex-1 text-sm">
@@ -559,7 +561,7 @@ export default function AssessmentDetailPage() {
                       <TableHead>Nome</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Target</TableHead>
-                      {!locked && <TableHead className="w-10" />}
+                      {!locked && !isClient && <TableHead className="w-10" />}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -568,7 +570,7 @@ export default function AssessmentDetailPage() {
                         <TableCell className="text-sm">{s.asset.name}</TableCell>
                         <TableCell><Badge variant="outline" className="text-xs">{s.asset.type}</Badge></TableCell>
                         <TableCell className="font-mono text-sm">{s.asset.value}</TableCell>
-                        {!locked && (
+                        {!locked && !isClient && (
                           <TableCell>
                             <Button
                               variant="ghost" size="icon"
@@ -611,7 +613,7 @@ export default function AssessmentDetailPage() {
               </div>
 
               {/* Tabs */}
-              {!locked && (
+              {!locked && !isClient && (
                 <div className="mt-3 flex gap-1 rounded-lg border bg-muted p-0.5 w-fit">
                   <button
                     onClick={() => setRoeTab("edit")}
@@ -632,7 +634,7 @@ export default function AssessmentDetailPage() {
             </CardHeader>
 
             <CardContent>
-              {roeTab === "edit" && !roeApproved && !locked ? (
+              {roeTab === "edit" && !roeApproved && !locked && !isClient ? (
                 <div className="space-y-3">
                   <Textarea
                     rows={18}
@@ -691,7 +693,7 @@ export default function AssessmentDetailPage() {
           </Card>
 
           {/* ── Lancia Scansione ── */}
-          {roeApproved && !locked && (
+          {roeApproved && !locked && !isClient && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-1.5 text-sm font-semibold">
@@ -699,35 +701,51 @@ export default function AssessmentDetailPage() {
                   Lancia Scansione
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Seleziona il tipo di scansione. L&apos;agent interno la eseguirà sugli asset in scope.
+                  {assessment.serviceType
+                    ? `Scansioni disponibili per "${assessment.serviceType.name}". Seleziona il tipo e avvia.`
+                    : "Nessun tipo di servizio associato. Modifica l'assessment per selezionarne uno."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid gap-2">
-                  {SCAN_TYPES.map((st) => (
-                    <button
-                      key={st.value}
-                      onClick={() => setScanType(st.value)}
-                      className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors
-                        ${scanType === st.value
-                          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                          : "border-border hover:border-primary/40 hover:bg-muted/50"}`}
-                    >
-                      <div className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-colors
-                        ${scanType === st.value ? "border-primary bg-primary" : "border-muted-foreground/40"}`}
-                      />
-                      <div>
-                        <p className="text-xs font-semibold leading-none text-foreground">{st.label}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{st.description}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                {(assessment.serviceType?.scanTypeDefs ?? []).length === 0 ? (
+                  <div className="rounded-md border border-dashed border-amber-300 bg-amber-50 py-5 text-center">
+                    <p className="text-sm font-medium text-amber-800">Nessun tipo di scan disponibile</p>
+                    <p className="text-xs text-amber-600">Associa un tipo di servizio con scan type attivi all&apos;assessment.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-2">
+                    {(assessment.serviceType?.scanTypeDefs ?? []).map((def: any) => (
+                      <button
+                        key={def.id}
+                        onClick={() => setScanTypeDefId(def.id)}
+                        className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors
+                          ${scanTypeDefId === def.id
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                            : "border-border hover:border-primary/40 hover:bg-muted/50"}`}
+                      >
+                        <div className={`mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-colors
+                          ${scanTypeDefId === def.id ? "border-primary bg-primary" : "border-muted-foreground/40"}`}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-semibold leading-none text-foreground">{def.name}</p>
+                            <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${ENGINE_BADGE[def.engine] ?? "bg-muted text-muted-foreground"}`}>
+                              {def.engine}
+                            </span>
+                          </div>
+                          {def.description && (
+                            <p className="mt-0.5 text-xs text-muted-foreground">{def.description}</p>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <Button
                   className="w-full"
                   onClick={launchScan}
-                  disabled={launchingJob}
+                  disabled={launchingJob || !scanTypeDefId}
                 >
                   {launchingJob
                     ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Avvio in corso…</>
@@ -753,7 +771,7 @@ export default function AssessmentDetailPage() {
                     <div className="space-y-1.5">
                       {assessment.scanJobs.slice(0, 8).map((j: any) => {
                         const cfg = JOB_STATUS_CONFIG[j.status] ?? JOB_STATUS_CONFIG.PENDING
-                        const scanLabel = SCAN_TYPES.find((s) => s.value === j.type)?.label ?? j.type
+                        const scanLabel = j.type
                         const cancellable = ["PENDING", "QUEUED", "RUNNING"].includes(j.status)
                         return (
                           <div key={j.id} className="flex items-center justify-between rounded-md border px-3 py-2">
@@ -763,7 +781,7 @@ export default function AssessmentDetailPage() {
                                 {cfg.icon}
                                 {cfg.label}
                               </span>
-                              {cancellable && (
+                              {cancellable && !isClient && (
                                 <button
                                   onClick={() => cancelJob(j.id)}
                                   disabled={cancellingJob === j.id}
@@ -839,18 +857,20 @@ export default function AssessmentDetailPage() {
                             <TableCell className="text-xs text-muted-foreground">{formatDate(h.createdAt)}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs"
-                                  onClick={(e) => { e.stopPropagation(); promoteHost(h.id) }}
-                                  disabled={promotingHost === h.id}
-                                >
-                                  {promotingHost === h.id
-                                    ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                    : <Plus className="mr-1 h-3 w-3" />}
-                                  Promuovi ad Asset
-                                </Button>
+                                {!isClient && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs"
+                                    onClick={(e) => { e.stopPropagation(); promoteHost(h.id) }}
+                                    disabled={promotingHost === h.id}
+                                  >
+                                    {promotingHost === h.id
+                                      ? <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                      : <Plus className="mr-1 h-3 w-3" />}
+                                    Promuovi ad Asset
+                                  </Button>
+                                )}
                                 {isExpanded
                                   ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
                                   : <ChevronDown className="h-4 w-4 text-muted-foreground" />}

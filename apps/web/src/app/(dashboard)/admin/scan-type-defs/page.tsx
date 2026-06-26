@@ -11,21 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
-const JOB_TYPE_LABELS: Record<string, string> = {
-  NMAP_DISCOVERY: "Nmap Discovery",
-  NMAP_FULL: "Nmap Full",
-  NMAP_VULN: "Nmap Vuln",
-  NUCLEI_CVE: "Nuclei CVE",
-  NUCLEI_WEBAPP: "Nuclei Web App",
-  MANUAL: "Manuale",
-}
-
-const JOB_TYPE_COLORS: Record<string, string> = {
-  NMAP_DISCOVERY: "bg-blue-100 text-blue-800",
-  NMAP_FULL: "bg-indigo-100 text-indigo-800",
-  NMAP_VULN: "bg-orange-100 text-orange-800",
-  NUCLEI_CVE: "bg-red-100 text-red-800",
-  NUCLEI_WEBAPP: "bg-purple-100 text-purple-800",
+const ENGINE_COLORS: Record<string, string> = {
+  NMAP:   "bg-blue-100 text-blue-800",
+  NUCLEI: "bg-purple-100 text-purple-800",
   MANUAL: "bg-gray-100 text-gray-800",
 }
 
@@ -94,7 +82,7 @@ export default function ScanTypeDefsPage() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Slug</TableHead>
-                <TableHead>Job Type</TableHead>
+                <TableHead>Engine</TableHead>
                 <TableHead>Nei servizi</TableHead>
                 <TableHead>Stato</TableHead>
                 <TableHead />
@@ -126,8 +114,8 @@ export default function ScanTypeDefsPage() {
                       <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{def.slug}</span>
                     </TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${JOB_TYPE_COLORS[def.scanJobType] ?? "bg-muted text-muted-foreground"}`}>
-                        {JOB_TYPE_LABELS[def.scanJobType] ?? def.scanJobType}
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ENGINE_COLORS[def.engine] ?? "bg-muted text-muted-foreground"}`}>
+                        {def.engine}
                       </span>
                     </TableCell>
                     <TableCell>

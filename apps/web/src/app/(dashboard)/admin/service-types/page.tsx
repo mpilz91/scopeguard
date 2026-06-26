@@ -11,14 +11,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
-const SCAN_LABELS: Record<string, string> = {
-  NMAP_DISCOVERY: "Discovery",
-  NMAP_FULL: "Nmap Full",
-  NMAP_VULN: "Nmap Vuln",
-  NUCLEI_CVE: "Nuclei CVE",
-  NUCLEI_WEBAPP: "Nuclei Web",
-  MANUAL: "Manuale",
-}
 
 export default function ServiceTypesPage() {
   const router = useRouter()
@@ -113,7 +105,7 @@ export default function ServiceTypesPage() {
                       <div className="flex flex-wrap gap-1">
                         {(st.scanTypeDefs ?? []).map((d: any) => (
                           <Badge key={d.id} variant="secondary" className="text-xs">
-                            {SCAN_LABELS[d.scanJobType] ?? d.name}
+                            {d.name}
                           </Badge>
                         ))}
                       </div>

@@ -4,13 +4,13 @@ import { requirePlatformAdmin } from "@/lib/auth"
 import { z } from "zod"
 import { audit } from "@/lib/audit"
 
-const VALID_JOB_TYPES = ["NMAP_DISCOVERY", "NMAP_FULL", "NMAP_VULN", "NUCLEI_CVE", "NUCLEI_WEBAPP", "MANUAL"]
+const VALID_ENGINES = ["NMAP", "NUCLEI", "MANUAL"] as const
 
 const createSchema = z.object({
   name: z.string().min(2, "Nome richiesto"),
   slug: z.string().min(2).regex(/^[a-z0-9-]+$/, "Slug: solo lettere minuscole, numeri e trattini"),
   description: z.string().optional().nullable(),
-  scanJobType: z.enum(VALID_JOB_TYPES as [string, ...string[]]),
+  engine: z.enum(VALID_ENGINES),
   defaultConfig: z.record(z.unknown()).optional().default({}),
   isActive: z.boolean().default(true),
 })
@@ -19,7 +19,7 @@ export async function GET() {
   try {
     await requirePlatformAdmin()
     const defs = await prisma.scanTypeDef.findMany({
-      orderBy: [{ scanJobType: "asc" }, { name: "asc" }],
+      orderBy: [{ engine: "asc" }, { name: "asc" }],
       include: { _count: { select: { serviceTypes: true } } },
     })
     return NextResponse.json(defs)
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       action: "SCAN_TYPE_DEF_CREATED",
       resource: "scan_type_def",
       resourceId: def.id,
-      metadata: { name: def.name, scanJobType: def.scanJobType },
+      metadata: { name: def.name, engine: def.engine },
     })
 
     return NextResponse.json(def, { status: 201 })

@@ -18,7 +18,7 @@ export async function GET() {
     const types = await prisma.serviceType.findMany({
       orderBy: { name: "asc" },
       include: {
-        scanTypeDefs: { select: { id: true, name: true, slug: true, scanJobType: true } },
+        scanTypeDefs: { select: { id: true, name: true, slug: true, engine: true } },
         _count: { select: { contracts: true, assessments: true } },
       },
     })
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         ...rest,
         scanTypeDefs: { connect: scanTypeDefIds.map((id) => ({ id })) },
       },
-      include: { scanTypeDefs: { select: { id: true, name: true, slug: true, scanJobType: true } } },
+      include: { scanTypeDefs: { select: { id: true, name: true, slug: true, engine: true } } },
     })
 
     await audit({
